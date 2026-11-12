@@ -56,6 +56,25 @@ public sealed class NotificationMessagesTests
         Assert.Contains("(99.9%)", tiny.Body);
     }
 
+    // The web UI renders the same size change (sizeChangePercent on the client). These are the
+    // same pairs as the client-side test (format.test.ts, "the same sizes read the same here as
+    // they do in the replacement notification"), so a change to one rule has to be made to the
+    // other in the same pull request.
+    [Fact]
+    public void Replacement_message_reads_the_same_change_as_the_web_ui()
+    {
+        Assert.Contains("(99.5%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 1000, 5).Body);
+        Assert.Contains("(99.6%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 1000, 4).Body);
+        Assert.Contains("(99%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 1000, 6).Body);
+        // A 2.5% change rounds away from zero, the way the web UI rounds it.
+        Assert.Contains("(3%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 1000, 975).Body);
+        Assert.Contains("(3%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 1000, 1025).Body);
+        Assert.Contains("(98%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 1000, 25).Body);
+        Assert.Contains("(99.9%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 100_000, 150).Body);
+        // A change finer than a tenth of a percent still reads as the change it is.
+        Assert.Contains("(0.1%)", NotificationMessages.ReplacementCompleted("/data/x.mkv", 9999, 9998).Body);
+    }
+
     [Fact]
     public void Replacement_message_gives_no_saving_when_the_new_size_is_unknown()
     {

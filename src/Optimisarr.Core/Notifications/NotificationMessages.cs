@@ -29,10 +29,19 @@ public static class NotificationMessages
 
     // Whole percents from 1% up; below that a tenth, and never 0% for a change that happened.
     // A saving whose file still exists is never the whole file, so it stops at 99.9%.
+    //
+    // The figure is measured from the byte delta and rounded half away from zero, so the same
+    // pair of sizes reads the same here and in the web UI (sizeChangePercent on the client).
+    // Math.Round's default is ToEven, which made a 2.5% change read as 2% here and 3% there,
+    // and measuring from the ratio rather than the delta let rounding noise cross the same
+    // boundary. Both surfaces now follow one rule, pinned by the same pairs in their tests.
     private static string Percent(double percent, bool saving)
     {
-        var shown = percent >= 1 ? Math.Round(percent) : Math.Max(0.1, Math.Round(percent, 1));
-        if (saving && percent >= 99.5) shown = Math.Min(99.9, Math.Round(percent, 1));
+        var shown = saving && percent >= 99.5
+            ? Math.Min(99.9, Math.Round(percent * 10, MidpointRounding.AwayFromZero) / 10)
+            : percent >= 1
+                ? Math.Round(percent, MidpointRounding.AwayFromZero)
+                : Math.Max(0.1, Math.Round(percent * 10, MidpointRounding.AwayFromZero) / 10);
         return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.#}%", shown);
     }
 

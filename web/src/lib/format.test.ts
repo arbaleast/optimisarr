@@ -32,7 +32,8 @@ test('size change follows the size itself: negative when the output is smaller, 
   // Near the end a tenth is kept, so 99.6% is not rounded up to the whole file.
   assert.equal(sizeChangePercent(1000, 4), -99.6)
   assert.equal(sizeChangePercent(1000, 6), -99)
-  assert.equal(sizeChangePercent(1000, 5), -99)
+  // Exactly 99.5% keeps its tenth too, so it reads the same here as in the notification.
+  assert.equal(sizeChangePercent(1000, 5), -99.5)
   // An output of no bytes means it could not be sized, not that everything was saved.
   assert.equal(sizeChangePercent(1000, 0), null)
   // A real pair of sizes.
@@ -80,6 +81,27 @@ test('the signed percent always agrees with the direction the bytes carry', () =
     if (status === 'saved') assert.ok(percent < 0, `${source} → ${output}: ${percent}`)
     if (status === 'grew') assert.ok(percent > 0, `${source} → ${output}: ${percent}`)
     if (status === 'unchanged') assert.equal(percent, 0)
+  }
+})
+
+// The replacement notification on the server renders the same size change
+// (NotificationMessages.Percent). These are the same pairs as the server-side test
+// (NotificationBuildersTests.Replacement_message_reads_the_same_change_as_the_web_ui),
+// so a change to one rule has to be made to the other in the same pull request.
+test('the same sizes read the same here as they do in the replacement notification', () => {
+  // original → new, and the percent both surfaces must agree on.
+  const pairs: [number, number, number][] = [
+    [1000, 5, -99.5],     // exactly 99.5% saved: the tenth is kept on both sides
+    [1000, 4, -99.6],     // a near-total saving is never the whole file
+    [1000, 6, -99],       // just under the near-total band
+    [1000, 975, -3],      // a 2.5% saving rounds away from zero, not to even
+    [1000, 1025, 3],      // a 2.5% growth rounds the same way
+    [1000, 25, -98],      // a 97.5% saving
+    [100000, 150, -99.9], // 99.85% saved
+    [9999, 9998, -0.1],   // a change finer than a tenth of a percent
+  ]
+  for (const [source, output, expected] of pairs) {
+    assert.equal(sizeChangePercent(source, output), expected, `${source} → ${output}`)
   }
 })
 

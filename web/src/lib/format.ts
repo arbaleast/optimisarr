@@ -52,16 +52,30 @@ export function sizeChangeStatus(sourceBytes: number, outputBytes: number): Size
 // one byte in a few megabytes — is shown at the display's resolution, ±0.1%, rather than as
 // no change, so the figure always agrees with the direction the bytes carry. For the same
 // reason a near-total saving stops at −99.9%: the output still exists, so it is not −100%.
+//
+// The figure is measured from the byte delta (|Δ| × 100 ÷ original) and rounded half away
+// from zero, so the same pair of sizes reads the same here and in the replacement
+// notification (NotificationMessages.Percent on the server). Measuring from the ratio
+// instead of the delta, or rounding halves to even, made the two surfaces disagree about
+// the same file — see the paired tests in format.test.ts and NotificationBuildersTests.cs.
 export function sizeChangePercent(sourceBytes: number, outputBytes: number): number | null {
   const status = sizeChangeStatus(sourceBytes, outputBytes)
   if (status === null) return null
-  const raw = (outputBytes / sourceBytes - 1) * 100
-  // Close to a total saving, a whole number would round up to −100%, so keep the tenth there.
-  if (raw < -99.5) return Math.max(-99.9, Math.round(raw * 10) / 10)
-  const percent = Math.abs(raw) >= 1 ? Math.round(raw) : Math.round(raw * 10) / 10
-  // Math.round(-0.01) is -0, and a -0 would slip past every `< 0` check as a saving.
-  if (percent === 0 && status !== 'unchanged') return status === 'saved' ? -0.1 : 0.1
-  return percent
+  const delta = outputBytes - sourceBytes
+  const saving = delta < 0
+  const magnitude = (Math.abs(delta) * 100) / sourceBytes
+  // Round half away from zero: Math.round(-2.5) is -2, and Math.round(2.5) is 3, so a
+  // signed value would round a saving and a growth differently from each other.
+  const shown =
+    saving && magnitude >= 99.5
+      ? Math.min(99.9, Math.round(magnitude * 10) / 10)
+      : magnitude >= 1
+        ? Math.round(magnitude)
+        : Math.round(magnitude * 10) / 10
+  // A real change finer than the display's resolution is shown at that resolution, signed
+  // by the bytes, rather than as a 0% that would describe a changed file as unchanged.
+  if (shown === 0 && status !== 'unchanged') return saving ? -0.1 : 0.1
+  return saving ? -shown : shown
 }
 
 // Every panel reads a size change from this one place, so the sign and the zero are written
